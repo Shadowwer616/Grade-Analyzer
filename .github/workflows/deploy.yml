@@ -1,5 +1,5 @@
 # 推到 main 时：安装 → 测试 → 构建 → 发布 dist 到 GitHub Pages。
-# 仓库 Settings → Pages → Source 需选「GitHub Actions」。
+# configure-pages 的 enablement: true 会在首次运行时自动把仓库的 Pages 打开（Source 设为 GitHub Actions）。
 name: Deploy to GitHub Pages
 
 on:
@@ -33,6 +33,8 @@ jobs:
       - run: npm run build
 
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
