@@ -1,10 +1,13 @@
 // 单门课的状态与修改动作（方案 §6：useReducer + Context）。纯函数，可单测。
 // 阶段 2 只有一门课、不保存；阶段 4 再把课程数组同步到 localStorage。
-import type { BonusItem, Course, GradeItem } from '../types';
+// 阶段 3：子项面板的编辑由 lib/advanced.ts 算出新的 advanced，再走 updateItem；等级表走 setScale。
+import type { BonusItem, Course, GradeItem, GradeScaleId, ScaleEntry } from '../types';
 import { sampleCourse } from '../data/sampleCourse';
 
 export type CourseAction =
   | { type: 'setTarget'; value: number }
+  /** 换等级表；customScale 给了就一并保存（自定义编辑器），不给则保留原有的自定义表 */
+  | { type: 'setScale'; gradeScale: GradeScaleId; customScale?: ScaleEntry[] }
   | { type: 'updateItem'; id: string; patch: Partial<Omit<GradeItem, 'id'>> }
   | { type: 'addItem' }
   | { type: 'removeItem'; id: string }
@@ -34,6 +37,13 @@ function apply(course: Course, action: CourseAction): Course {
   switch (action.type) {
     case 'setTarget':
       return { ...course, target: clamp(action.value, 0, 100) };
+
+    case 'setScale': {
+      const customScale = action.customScale ?? course.customScale;
+      // 选「自定义」但还没有自定义表时不切换（界面会先打开编辑器）
+      if (action.gradeScale === 'custom' && !customScale?.length) return course;
+      return { ...course, gradeScale: action.gradeScale, customScale };
+    }
 
     case 'updateItem':
       return { ...course, items: mapItem(course, action.id, (i) => ({ ...i, ...action.patch })) };

@@ -1,11 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GradeItem } from '../types';
-import { formatScore as f, type CourseResult, type ItemResult } from '../lib/grade';
+import { formatScore as f, isFinalItem, type CourseResult, type ItemResult } from '../lib/grade';
 import { useCourse } from '../state/CourseContext';
-import { btn, feasibilityTone, field, IconClose, IconPen, IconPlus, IconTrash, NumberInput, Pill, trim1 } from './ui';
+import { btn, feasibilityTone, field, IconChevron, IconClose, IconPen, IconPlus, IconTrash, NumberInput, Pill, trim1 } from './ui';
+import { AdvancedPanel } from './AdvancedPanel';
 
-/** 七列：评分项 / 权重 / 满分 / 已得分 / 状态 / 需要 · 假设 / 删除 */
-const GRID = 'grid grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_3.2fr_34px] items-center gap-4 px-6';
+/** 八列：评分项 / 权重 / 满分 / 已得分 / 状态 / 需要 · 假设 / 高级 / 删除 */
+const GRID = 'grid grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_3fr_76px_34px] items-center gap-4 px-6';
 
 export function GradeTable() {
   const { course, result: r, dispatch } = useCourse();
@@ -43,9 +44,10 @@ export function GradeTable() {
       </div>
 
       <div className="overflow-x-auto">
-        <div className="flex min-w-[880px] flex-col">
+        <div className="flex min-w-[960px] flex-col">
           <div className={`${GRID} bg-head py-2.5 text-xs font-semibold text-muted`}>
             <span>评分项</span><span>权重 %</span><span>满分</span><span>已得分</span><span>状态</span><span>需要 · 假设</span>
+            <span className="sr-only">高级</span>
             <span className="sr-only">删除</span>
           </div>
 
@@ -87,6 +89,9 @@ function ItemRow({ item, res, r, autoFocus }: { item: GradeItem; res: ItemResult
   const update = (patch: Partial<GradeItem>) => dispatch({ type: 'updateItem', id: item.id, patch });
   const open = res.status !== 'completed';
   const label = item.name || '未命名';
+  const hasSub = !!item.advanced && item.advanced.count > 0;
+  const advActive = hasSub || (isFinalItem(item) && !!item.replaces);
+  const [expanded, setExpanded] = useState(false);
 
   const secondary =
     res.summary ||
@@ -95,67 +100,121 @@ function ItemRow({ item, res, r, autoFocus }: { item: GradeItem; res: ItemResult
       : res.status === 'assumed' ? '未出分 · 按假设计算' : '未出分');
 
   return (
-    <div className={`${GRID} border-t border-divide py-3.5 ${res.status === 'assumed' ? 'bg-assume-row' : ''}`}>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <input
-          value={item.name}
-          onChange={(e) => update({ name: e.target.value })}
-          onFocus={(e) => e.target.select()}
-          autoFocus={autoFocus}
-          placeholder="评分项名称"
-          aria-label="评分项名称"
-          className="-mx-1.5 min-w-0 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[15px] font-semibold text-ink outline-none hover:border-edge focus:border-assume focus:bg-white"
+    <div>
+      <div className={`${GRID} border-t border-divide py-3.5 ${res.status === 'assumed' ? 'bg-assume-row' : ''}`}>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <input
+            value={item.name}
+            onChange={(e) => update({ name: e.target.value })}
+            onFocus={(e) => e.target.select()}
+            autoFocus={autoFocus}
+            placeholder="评分项名称"
+            aria-label="评分项名称"
+            className="-mx-1.5 min-w-0 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[15px] font-semibold text-ink outline-none hover:border-edge focus:border-assume focus:bg-white"
+          />
+          <span className={`truncate text-xs ${advActive ? 'text-assume-dark' : 'text-muted'}`} title={secondary} data-testid={`summary-${item.id}`}>
+            {secondary}
+          </span>
+        </div>
+
+        <NumberInput
+          value={item.weight}
+          onValue={(v) => update({ weight: v ?? 0 })}
+          min={0}
+          step="any"
+          aria-label={`${label}权重`}
+          className={`${field.base} ${field.solid} w-14`}
         />
-        <span className="truncate text-xs text-muted">{secondary}</span>
+        {hasSub ? (
+          <span className="text-[13px] text-muted">按子项</span>
+        ) : (
+          <NumberInput
+            value={item.max}
+            onValue={(v) => v !== null && v > 0 && update({ max: v })}
+            min={0}
+            step="any"
+            aria-label={`${label}满分`}
+            className={`${field.base} ${field.solid} w-14`}
+          />
+        )}
+        {hasSub ? (
+          <SubScoreReadout res={res} label={label} />
+        ) : (
+          <NumberInput
+            value={item.score}
+            onValue={(v) => update({ score: v })}
+            allowEmpty
+            min={0}
+            step="any"
+            placeholder="未出分"
+            aria-label={`${label}已得分`}
+            className={`${field.base} w-16 ${
+              open ? 'border-dashed border-dash bg-transparent' : 'border-edge bg-white font-semibold'
+            }`}
+          />
+        )}
+
+        <span><StatusPill status={res.status} /></span>
+
+        <div className="min-w-0">
+          {res.status === 'completed' && <Contribution res={res} />}
+          {res.status === 'assumed' &&
+            (hasSub ? (
+              <span className="text-[13px] text-assume-dark">
+                按子项假设 <strong className="text-base">{f(res.percent ?? 0)}%</strong>
+              </span>
+            ) : (
+              <AssumeEditor item={item} label={label} />
+            ))}
+          {res.status === 'pending' && (
+            <Need item={item} res={res} r={r} onSubAssume={hasSub ? () => setExpanded(true) : undefined} />
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls={`adv-${item.id}`}
+          title={expanded ? '收起高级' : isFinalItem(item) ? '多次子项、期末替代期中' : '多次子项'}
+          className={`inline-flex h-8 cursor-pointer items-center justify-center gap-1 rounded-lg border px-2 text-[13px] font-semibold ${
+            expanded || advActive
+              ? 'border-assume-edge bg-assume-tint text-assume-dark'
+              : 'border-edge bg-white text-muted hover:bg-page hover:text-ink'
+          }`}
+        >
+          高级
+          <span className={`transition-transform ${expanded ? 'rotate-180' : ''}`}><IconChevron size={12} /></span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'removeItem', id: item.id })}
+          aria-label={`删除${label}`}
+          title="删除这一项"
+          className={`${btn.icon} border-transparent bg-transparent hover:border-bad-tint hover:bg-bad-tint hover:text-bad`}
+        >
+          <IconTrash />
+        </button>
       </div>
-
-      <NumberInput
-        value={item.weight}
-        onValue={(v) => update({ weight: v ?? 0 })}
-        min={0}
-        step="any"
-        aria-label={`${label}权重`}
-        className={`${field.base} ${field.solid} w-14`}
-      />
-      <NumberInput
-        value={item.max}
-        onValue={(v) => v !== null && v > 0 && update({ max: v })}
-        min={0}
-        step="any"
-        aria-label={`${label}满分`}
-        className={`${field.base} ${field.solid} w-14`}
-      />
-      <NumberInput
-        value={item.score}
-        onValue={(v) => update({ score: v })}
-        allowEmpty
-        min={0}
-        step="any"
-        placeholder="未出分"
-        aria-label={`${label}已得分`}
-        className={`${field.base} w-16 ${
-          open ? 'border-dashed border-dash bg-transparent' : 'border-edge bg-white font-semibold'
-        }`}
-      />
-
-      <span><StatusPill status={res.status} /></span>
-
-      <div className="min-w-0">
-        {res.status === 'completed' && <Contribution res={res} />}
-        {res.status === 'assumed' && <AssumeEditor item={item} label={label} />}
-        {res.status === 'pending' && <Need item={item} res={res} r={r} />}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => dispatch({ type: 'removeItem', id: item.id })}
-        aria-label={`删除${label}`}
-        title="删除这一项"
-        className={`${btn.icon} border-transparent bg-transparent hover:border-bad-tint hover:bg-bad-tint hover:text-bad`}
-      >
-        <IconTrash />
-      </button>
+      {expanded && <AdvancedPanel item={item} res={res} r={r} />}
     </div>
+  );
+}
+
+/** 有子项时主表「已得分」只读：完成或全部假设时显示这一项的百分比，否则显示已完成部分 */
+function SubScoreReadout({ res, label }: { res: ItemResult; label: string }) {
+  const v = res.status === 'pending' ? res.currentPercent : res.percent;
+  return (
+    <output
+      aria-label={`${label}已得分（由子项算出）`}
+      title={res.status === 'pending' && v !== null ? '已完成部分，由子项算出' : '由子项算出'}
+      className={`inline-flex h-[34px] w-16 items-center justify-center rounded-lg border border-edge bg-page text-sm ${
+        res.status === 'pending' ? 'text-muted' : 'font-semibold text-ink'
+      }`}
+    >
+      {v === null ? '—' : `${f(v)}%`}
+    </output>
   );
 }
 
@@ -176,7 +235,9 @@ function Contribution({ res }: { res: ItemResult }) {
 }
 
 /** 未完成：「需要 X%」+「假设」按钮 */
-function Need({ item, res, r }: { item: GradeItem; res: ItemResult; r: CourseResult }) {
+function Need({
+  item, res, r, onSubAssume,
+}: { item: GradeItem; res: ItemResult; r: CourseResult; onSubAssume?: () => void }) {
   const { dispatch } = useCourse();
   const tone = feasibilityTone(r.status);
   const others = r.items.filter((i) => i.required !== null && i.id !== item.id);
@@ -206,10 +267,11 @@ function Need({ item, res, r }: { item: GradeItem; res: ItemResult; r: CourseRes
       </span>
       <button
         type="button"
-        onClick={assume}
+        onClick={onSubAssume ?? assume}
+        title={onSubAssume ? '有子项时在「高级」里逐次假设' : undefined}
         className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-assume bg-white px-3 text-[13px] font-semibold whitespace-nowrap text-assume-dark hover:bg-assume-tint"
       >
-        <IconPen />假设
+        <IconPen />{onSubAssume ? '逐次假设' : '假设'}
       </button>
     </div>
   );
@@ -309,6 +371,7 @@ function BonusRow() {
           · {r.bonusOverMax ? `超过上限，按最多 +${trim1(bonus.max)} 计` : `最多 +${trim1(bonus.max)}`}
         </span>
       </span>
+      <span />
       <button
         type="button"
         onClick={() => dispatch({ type: 'removeBonus' })}

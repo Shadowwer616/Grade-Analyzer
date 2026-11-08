@@ -268,6 +268,32 @@ export function midtermCandidates(course: Course, finalId: string): GradeItem[] 
   return course.items.filter((i) => i.id !== finalId && /期中|midterm/i.test(i.name));
 }
 
+/** 期末行：id 为 final，或名称含「期末」/ final（不分大小写）。只有期末行的「高级」里有「可替代」（阶段 3） */
+export function isFinalItem(item: Pick<GradeItem, 'id' | 'name'>): boolean {
+  return item.id === 'final' || /期末|final/i.test(item.name);
+}
+
+/** 「可替代」下拉的选项：不替代 / 其他每一行 / 分数最低的那次期中（没有含「期中」的项时置灰） */
+export interface ReplaceOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export function replaceOptions(course: Course, finalId: string): ReplaceOption[] {
+  const others = course.items.filter((i) => i.id !== finalId);
+  const mids = midtermCandidates(course, finalId);
+  return [
+    { value: '', label: '不替代' },
+    ...others.map((i) => ({ value: i.id, label: i.name || '未命名' })),
+    {
+      value: REPLACE_LOWEST_MIDTERM,
+      label: mids.length ? `分数最低的那次期中（${mids.map((m) => m.name).join(' / ')}）` : '分数最低的那次期中（没有名称含「期中」的项）',
+      disabled: mids.length === 0,
+    },
+  ];
+}
+
 /** 权重合计 ≠ 100% 时一键归一化：w_i / Σw，保留 1 位小数，尾差补到权重最大的一项 */
 export function normalizeWeights(course: Course): Course {
   const S = course.items.reduce((s, i) => s + Math.max(0, i.weight || 0), 0);
@@ -486,10 +512,17 @@ export function computeCourse(course: Course): CourseResult {
 
 // ───────────────────────── 结论句 ─────────────────────────
 
+/** 结论句里的目标：「85（B）」；目标是整数时不带小数，否则保留 1 位；没有对应等级时只写数字（阶段 3） */
+export function formatTarget(target: number, grade: string | null): string {
+  const r = Math.round(target * 10) / 10;
+  const n = Number.isInteger(r) ? String(r) : r.toFixed(1);
+  return grade ? `${n}（${grade}）` : n;
+}
+
 function buildConclusion(r: CourseResult, byId: Map<string, ItemEval>, normal: Scenario): string {
   const f = formatScore;
   const withGrade = (v: number, g: string | null) => (g ? `${f(v)}（${g}）` : f(v));
-  const T = f(r.target);
+  const T = formatTarget(r.target, r.targetGrade);
   const rep = r.replacement;
   const fItem = rep ? byId.get(rep.finalId)! : null;
   const mItem = rep?.targetId ? byId.get(rep.targetId)! : null;

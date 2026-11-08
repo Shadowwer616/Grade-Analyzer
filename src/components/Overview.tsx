@@ -1,13 +1,32 @@
+import { useState } from 'react';
+import type { GradeScaleId, ScaleEntry } from '../types';
 import { formatScore as f, progressBreakdown } from '../lib/grade';
-import { SCALE_PRESETS } from '../lib/scales';
+import { resolveScale, SCALE_OPTIONS } from '../lib/scales';
 import { useCourse } from '../state/CourseContext';
-import { feasibilityTone, field, NumberInput, Pill } from './ui';
+import { ScaleEditor } from './ScaleEditor';
+import { btn, feasibilityTone, field, NumberInput, Pill, trim1 } from './ui';
 
 export function Overview() {
   const { course, result: r, dispatch } = useCourse();
   const b = progressBreakdown(r);
   const tone = feasibilityTone(r.status);
   const setTarget = (v: number | null) => v !== null && dispatch({ type: 'setTarget', value: v });
+
+  // 等级表：选「自定义…」且还没有自定义表时先打开编辑器（以当前等级表为底稿）
+  const scale = resolveScale(course.gradeScale, course.customScale);
+  const [editing, setEditing] = useState(false);
+  const pickScale = (id: GradeScaleId) => {
+    if (id === 'custom' && !course.customScale?.length) setEditing(true);
+    else dispatch({ type: 'setScale', gradeScale: id });
+  };
+  const saveScale = (entries: ScaleEntry[]) => {
+    dispatch({ type: 'setScale', gradeScale: 'custom', customScale: entries });
+    setEditing(false);
+  };
+
+  // 目标等级下拉：目标正好等于某档下限时选中那一档；否则显示「≈ 当前等级」占位，选任意一档都会生效
+  const exact = scale.find(([l, m]) => l === r.targetGrade && Math.abs(m - course.target) < 1e-9);
+  const gradeValue = exact ? exact[0] : '';
 
   const segments = [
     { key: 'earned', label: '已拿到', value: f(b.earned), width: b.earned, color: 'bg-ink' },
@@ -74,7 +93,21 @@ export function Overview() {
               step="any"
               className={`${field.base} ${field.solid} w-[72px] text-right text-xl font-bold`}
             />
-            {r.targetGrade && <span className="text-[13px] font-semibold text-muted">· {r.targetGrade}</span>}
+            <select
+              value={gradeValue}
+              onChange={(e) => {
+                const hit = scale.find(([l]) => l === e.target.value);
+                if (hit) setTarget(hit[1]);
+              }}
+              aria-label="按等级设目标"
+              title="选等级，目标设为该等级的下限"
+              className="h-[34px] rounded-lg border border-edge bg-white px-2 text-[13px] font-semibold text-ink"
+            >
+              {!exact && <option value="" disabled>{r.targetGrade ? `≈ ${r.targetGrade}` : '等级'}</option>}
+              {scale.map(([l, m]) => (
+                <option key={l} value={l}>{l} · ≥{trim1(m)}</option>
+              ))}
+            </select>
           </span>
         </div>
         <input
@@ -89,24 +122,34 @@ export function Overview() {
         />
         <div className="flex items-center justify-between gap-3">
           <label htmlFor="scale" className="text-[13px] text-muted">等级表</label>
-          {/* 第 2 阶段只做美式 10 分制；其余预设和自定义在第 3 阶段 */}
-          <select
-            id="scale"
-            value={course.gradeScale}
-            onChange={() => {}}
-            className="h-[34px] rounded-lg border border-edge bg-white px-2.5 text-[13px] text-ink"
-          >
-            <option value="us-10">美式 A/B/C（10 分制）</option>
-            <option value="us-letter" disabled>{SCALE_PRESETS['us-letter'].name}（即将支持）</option>
-            <option value="cn-100" disabled>{SCALE_PRESETS['cn-100'].name}（即将支持）</option>
-            <option value="custom" disabled>自定义…（即将支持）</option>
-          </select>
+          <span className="flex items-center gap-2">
+            {course.gradeScale === 'custom' && (
+              <button type="button" onClick={() => setEditing(true)} className={`${btn.base} ${btn.outline} h-[34px]! px-2.5! text-[13px]`}>
+                编辑
+              </button>
+            )}
+            <select
+              id="scale"
+              value={course.gradeScale}
+              onChange={(e) => pickScale(e.target.value as GradeScaleId)}
+              className="h-[34px] rounded-lg border border-edge bg-white px-2.5 text-[13px] text-ink"
+            >
+              {SCALE_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>{o.id === 'custom' && course.customScale?.length ? '自定义' : o.name}</option>
+              ))}
+            </select>
+          </span>
+        </div>
+        <div className="-mt-1 text-right text-xs text-muted" data-testid="scale-summary">
+          {scale.slice(0, 6).map(([l, m]) => `${l} ≥${trim1(m)}`).join(' · ')}
+          {scale.length > 6 ? ' …' : ''}
         </div>
         <div className="mt-1 flex items-start gap-2.5">
           <Pill className={tone.pill}>{r.statusLabel}</Pill>
           <span className="pt-0.5 text-[13px] leading-snug text-ink">{r.conclusion}</span>
         </div>
       </div>
+      {editing && <ScaleEditor initial={course.customScale?.length ? course.customScale : scale} onSave={saveScale} onCancel={() => setEditing(false)} />}
     </section>
   );
 }

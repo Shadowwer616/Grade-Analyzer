@@ -79,7 +79,7 @@ describe('§3 贯穿算例', () => {
     expect(r.statusLabel).toBe('可达');
     const fin = r.items.find((i) => i.id === 'final')!;
     expect(fin.required).toBeCloseTo(81, 6);
-    expect(r.conclusion).toBe('期末至少需要 81.0%，总评才能达到 85.0');
+    expect(r.conclusion).toBe('期末至少需要 81.0%，总评才能达到 85（B）');
   });
 
   it('最低 / 最高可能 52.6 / 92.6（A-），距目标还需 32.4', () => {
@@ -165,12 +165,12 @@ describe('§3 边界', () => {
     expect(r.items.every((i) => i.required === null)).toBe(true);
     expect(r.final).toBeCloseTo(85, 6);
     expect(r.status).toBe('met');
-    expect(r.conclusion).toBe('最终 85.0（B），达到目标 85.0');
+    expect(r.conclusion).toBe('最终 85.0（B），达到目标 85（B）');
 
     const r2 = computeCourse({ ...c, target: 90 });
     expect(r2.status).toBe('notMet');
     expect(r2.statusLabel).toBe('未达成');
-    expect(r2.conclusion).toBe('最终 85.0（B），未达到目标 90.0');
+    expect(r2.conclusion).toBe('最终 85.0（B），未达到目标 90（A-）');
   });
 
   it('已完成子项数 ≤ K：不 drop，提示「成绩再多些后生效」', () => {
@@ -234,7 +234,7 @@ describe('可行性', () => {
     expect(r.required).toBeCloseTo((85 - 30) / 0.4, 6);
     expect(r.status).toBe('unreachable');
     expect(r.maxPossible).toBeCloseTo(70, 6);
-    expect(r.conclusion).toBe('剩余项全部满分最高也只有 70.0（C-），达不到目标 85.0');
+    expect(r.conclusion).toBe('剩余项全部满分最高也只有 70.0（C-），达不到目标 85（B）');
   });
 
   it('x ≤ 0 → 已达成', () => {
@@ -242,7 +242,7 @@ describe('可行性', () => {
     expect(r.required!).toBeLessThanOrEqual(0);
     expect(r.status).toBe('secured');
     expect(r.statusLabel).toBe('已达成');
-    expect(r.conclusion).toBe('已稳拿 90.0，剩余项全部 0 分也能达到目标 85.0');
+    expect(r.conclusion).toBe('已稳拿 90.0，剩余项全部 0 分也能达到目标 85（B）');
   });
 
   it('多项未完成时均分剩余需求', () => {
@@ -253,7 +253,7 @@ describe('可行性', () => {
     ], { target: 86 }));
     expect(r.required).toBeCloseTo(90, 6);
     expect(r.items.filter((i) => i.required !== null)).toHaveLength(2);
-    expect(r.conclusion).toBe('剩余 2 项每项至少需要 90.0%，总评才能达到 86.0');
+    expect(r.conclusion).toBe('剩余 2 项每项至少需要 90.0%，总评才能达到 86（B）');
   });
 
   it('没有任何已完成项：当前成绩为空，预估为空', () => {
@@ -389,7 +389,7 @@ describe('期末替代：更多情况', () => {
     const r = computeCourse(c);
     expect(r.replacement!.active).toBe(false);
     expect(r.required).toBeCloseTo(75, 6);
-    expect(r.conclusion).toBe('期末至少需要 75.0%，总评才能达到 85.0');
+    expect(r.conclusion).toBe('期末至少需要 75.0%，总评才能达到 85（B）');
   });
 
   it('期末已假设、被替代的期中还没考：期中不再需要分数', () => {
@@ -416,6 +416,6 @@ describe('期末替代：更多情况', () => {
     // 不替代：(80 − 12) / 0.8 = 85；替代：80 / 1.0 = 80 > 60
     expect(r.replacement!.requiredWithout).toBeCloseTo(85, 6);
     expect(r.required).toBeCloseTo(80, 6);
-    expect(r.conclusion).toBe('剩余 2 项每项至少需要 80.0%，总评才能达到 80.0；期末考到 80.0 会替代期中一（60.0），不替代则需要 85.0');
+    expect(r.conclusion).toBe('剩余 2 项每项至少需要 80.0%，总评才能达到 80（B-）；期末考到 80.0 会替代期中一（60.0），不替代则需要 85.0');
   });
 });
