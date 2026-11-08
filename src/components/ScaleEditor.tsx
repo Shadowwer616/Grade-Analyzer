@@ -1,4 +1,5 @@
 // 自定义等级表编辑器（方案 §2.4，阶段 3）：改每档名称和下限、增删档位，保存为课程的 customScale。
+// 阶段 4：可勾选「存为我的预设」，同时存进 myScales，所有课程都能选。
 import { useEffect, useRef, useState } from 'react';
 import type { ScaleEntry } from '../types';
 import { checkScale } from '../lib/scales';
@@ -11,8 +12,20 @@ interface Row {
 }
 
 export function ScaleEditor({
-  initial, onSave, onCancel,
-}: { initial: ScaleEntry[]; onSave: (entries: ScaleEntry[]) => void; onCancel: () => void }) {
+  initial, onSave, onCancel, presetNames = [], defaultPresetName = '',
+}: {
+  initial: ScaleEntry[];
+  /** presetName 非 null = 勾了「存为我的预设」 */
+  onSave: (entries: ScaleEntry[], presetName: string | null) => void;
+  onCancel: () => void;
+  /** 已有的「我的预设」名字，同名时提示会覆盖 */
+  presetNames?: string[];
+  /** 正在编辑的表本来就是某个预设时，默认勾上并填它的名字 */
+  defaultPresetName?: string;
+}) {
+  const [asPreset, setAsPreset] = useState(defaultPresetName !== '');
+  const [presetName, setPresetName] = useState(defaultPresetName || '我的等级表');
+  const presetTrim = presetName.trim();
   const nextKey = useRef(0);
   const [rows, setRows] = useState<Row[]>(() =>
     [...initial].sort((a, b) => b[1] - a[1]).map(([label, min]) => ({ key: nextKey.current++, label, min })),
@@ -29,7 +42,8 @@ export function ScaleEditor({
   }, []);
 
   const entries: ScaleEntry[] = rows.map((r) => [r.label, r.min ?? NaN]);
-  const { errors, entries: sorted } = checkScale(entries);
+  const { errors: scaleErrors, entries: sorted } = checkScale(entries);
+  const errors = asPreset && !presetTrim ? [...scaleErrors, '预设名不能为空'] : scaleErrors;
   const lowest = sorted[sorted.length - 1];
 
   const patch = (key: number, p: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...p } : r)));
@@ -96,6 +110,28 @@ export function ScaleEditor({
           </button>
         </div>
 
+        <div className="flex flex-col gap-2 rounded-[10px] bg-page px-3.5 py-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" checked={asPreset} onChange={(e) => setAsPreset(e.target.checked)} className="accent-assume" />
+            存为我的预设
+            <span className="text-xs text-muted">所有课程的等级表下拉里都能选</span>
+          </label>
+          {asPreset && (
+            <div className="flex flex-col gap-1">
+              <input
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                maxLength={40}
+                aria-label="预设名称"
+                className={`${field.base} ${field.solid}`}
+              />
+              {presetNames.includes(presetTrim) && (
+                <span className="text-xs text-bonus-dark">会更新已有的预设「{presetTrim}」；已经用它的课程不受影响</span>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="min-h-[18px] text-xs" aria-live="polite">
           {errors.length > 0 ? (
             <span className="text-bad">{errors.join('；')}</span>
@@ -108,7 +144,7 @@ export function ScaleEditor({
           <button type="button" onClick={onCancel} className={`${btn.base} ${btn.outline}`}>取消</button>
           <button
             type="button"
-            onClick={() => onSave(sorted)}
+            onClick={() => onSave(sorted, asPreset ? presetTrim : null)}
             disabled={errors.length > 0}
             className={`${btn.base} ${btn.primary}`}
           >

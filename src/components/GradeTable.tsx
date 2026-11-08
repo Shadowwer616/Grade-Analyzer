@@ -107,6 +107,8 @@ function ItemRow({ item, res, r, autoFocus }: { item: GradeItem; res: ItemResult
             value={item.name}
             onChange={(e) => update({ name: e.target.value })}
             onFocus={(e) => e.target.select()}
+            // 失焦时才检查：改名后不再是期末行，就清掉「可替代」（阶段 4）
+            onBlur={() => dispatch({ type: 'updateItem', id: item.id, patch: {}, commit: true })}
             autoFocus={autoFocus}
             placeholder="评分项名称"
             aria-label="评分项名称"

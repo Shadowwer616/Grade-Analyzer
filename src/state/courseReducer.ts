@@ -1,14 +1,20 @@
 // 单门课的状态与修改动作（方案 §6：useReducer + Context）。纯函数，可单测。
 // 阶段 2 只有一门课、不保存；阶段 4 再把课程数组同步到 localStorage。
 // 阶段 3：子项面板的编辑由 lib/advanced.ts 算出新的 advanced，再走 updateItem；等级表走 setScale。
+// 阶段 4：多课程在 state/appStore.ts，这里仍只管一门课；新增 clearScores、normalizeWeights，updateItem 加 commit。
 import type { BonusItem, Course, GradeItem, GradeScaleId, ScaleEntry } from '../types';
 import { sampleCourse } from '../data/sampleCourse';
+import { isFinalItem, normalizeWeights } from '../lib/grade';
 
 export type CourseAction =
   | { type: 'setTarget'; value: number }
   /** 换等级表；customScale 给了就一并保存（自定义编辑器），不给则保留原有的自定义表 */
   | { type: 'setScale'; gradeScale: GradeScaleId; customScale?: ScaleEntry[] }
-  | { type: 'updateItem'; id: string; patch: Partial<Omit<GradeItem, 'id'>> }
+  /**
+   * 改一行。commit = 名称输入框失焦时传 true：这时才检查改名后是否还是期末行，
+   * 不是的话清掉 replaces（输入过程中不判断，免得打字途中误清）。
+   */
+  | { type: 'updateItem'; id: string; patch: Partial<Omit<GradeItem, 'id'>>; commit?: boolean }
   | { type: 'addItem' }
   | { type: 'removeItem'; id: string }
   | { type: 'assume'; id: string; value: number }
@@ -17,6 +23,10 @@ export type CourseAction =
   | { type: 'addBonus' }
   | { type: 'updateBonus'; patch: Partial<BonusItem> }
   | { type: 'removeBonus' }
+  /** 保留结构，清掉已得分、子项分、所有假设、Bonus 已得 */
+  | { type: 'clearScores' }
+  /** 权重按比例归一化到合计 100（grade.ts 的 normalizeWeights） */
+  | { type: 'normalizeWeights' }
   | { type: 'reset' };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -45,8 +55,14 @@ function apply(course: Course, action: CourseAction): Course {
       return { ...course, gradeScale: action.gradeScale, customScale };
     }
 
-    case 'updateItem':
-      return { ...course, items: mapItem(course, action.id, (i) => ({ ...i, ...action.patch })) };
+    case 'updateItem': {
+      const target = course.items.find((i) => i.id === action.id);
+      if (!target) return course;
+      let next: GradeItem = { ...target, ...action.patch };
+      if (action.commit && next.replaces && !isFinalItem(next)) next = { ...next, replaces: null };
+      if (Object.keys(action.patch).length === 0 && next.replaces === target.replaces) return course;
+      return { ...course, items: mapItem(course, action.id, () => next) };
+    }
 
     case 'addItem': {
       const item: GradeItem = { id: newItemId(course.items), name: '新评分项', weight: 0, max: 100, score: null };
@@ -86,6 +102,25 @@ function apply(course: Course, action: CourseAction): Course {
 
     case 'removeBonus':
       return { ...course, bonus: null };
+
+    case 'clearScores':
+      return {
+        ...course,
+        items: course.items.map((i) => ({
+          ...i,
+          score: null,
+          assumed: null,
+          ...(i.advanced
+            ? { advanced: { ...i.advanced, scores: i.advanced.scores.map(() => null), assumed: i.advanced.assumed.map(() => null) } }
+            : {}),
+        })),
+        bonus: course.bonus ? { ...course.bonus, score: null } : null,
+      };
+
+    case 'normalizeWeights': {
+      const next = normalizeWeights(course);
+      return next.items.every((i, k) => i.weight === course.items[k].weight) ? course : next;
+    }
 
     case 'reset':
       return sampleCourse();

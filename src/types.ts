@@ -69,3 +69,22 @@ export interface Course {
   /** ISO 时间 */
   updatedAt: string;
 }
+
+// ── 阶段 4：本地保存（方案 §5「本地保存」） ──
+
+/** 「我的预设」等级表，所有课程共用；课程选用时把 entries 复制进 customScale */
+export interface MyScale {
+  id: string;
+  name: string;
+  entries: ScaleEntry[];
+}
+
+/** localStorage 里存的整个对象 */
+export interface SavedData {
+  version: 1;
+  /** 当前打开的课程 id */
+  currentId: string;
+  /** 至少一门 */
+  courses: Course[];
+  myScales: MyScale[];
+}

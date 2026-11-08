@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { GradeScaleId, ScaleEntry } from '../types';
 import { formatScore as f, progressBreakdown } from '../lib/grade';
 import { resolveScale, SCALE_OPTIONS } from '../lib/scales';
-import { useCourse } from '../state/CourseContext';
+import { useApp, useCourse } from '../state/CourseContext';
+import { sameScale } from '../state/appStore';
 import { ScaleEditor } from './ScaleEditor';
 import { btn, feasibilityTone, field, NumberInput, Pill, trim1 } from './ui';
 
@@ -14,13 +15,27 @@ export function Overview() {
 
   // 等级表：选「自定义…」且还没有自定义表时先打开编辑器（以当前等级表为底稿）
   const scale = resolveScale(course.gradeScale, course.customScale);
-  const [editing, setEditing] = useState(false);
-  const pickScale = (id: GradeScaleId) => {
-    if (id === 'custom' && !course.customScale?.length) setEditing(true);
+  // 'edit' = 编辑当前表（是预设时默认勾「存为我的预设」）；'new' = 从预设另起一张本课自定义表
+  const [editing, setEditing] = useState<false | 'edit' | 'new'>(false);
+  // 阶段 4「我的预设」：选用时把档位复制进这门课的 customScale；下拉里按内容认出正在用哪个预设
+  const { data, dispatch: appDispatch } = useApp();
+  const myScales = data.myScales;
+  const usingPreset =
+    course.gradeScale === 'custom' ? myScales.find((s) => sameScale(s.entries, course.customScale)) : undefined;
+  const scaleValue = usingPreset ? `my:${usingPreset.id}` : course.gradeScale;
+  const pickScale = (value: string) => {
+    if (value.startsWith('my:')) {
+      const preset = myScales.find((s) => `my:${s.id}` === value);
+      if (preset) dispatch({ type: 'setScale', gradeScale: 'custom', customScale: preset.entries.map(([l, m]) => [l, m]) });
+      return;
+    }
+    const id = value as GradeScaleId;
+    if (id === 'custom' && (!course.customScale?.length || usingPreset)) setEditing(usingPreset ? 'new' : 'edit');
     else dispatch({ type: 'setScale', gradeScale: id });
   };
-  const saveScale = (entries: ScaleEntry[]) => {
+  const saveScale = (entries: ScaleEntry[], presetName: string | null) => {
     dispatch({ type: 'setScale', gradeScale: 'custom', customScale: entries });
+    if (presetName) appDispatch({ type: 'saveMyScale', name: presetName, entries });
     setEditing(false);
   };
 
@@ -124,19 +139,29 @@ export function Overview() {
           <label htmlFor="scale" className="text-[13px] text-muted">等级表</label>
           <span className="flex items-center gap-2">
             {course.gradeScale === 'custom' && (
-              <button type="button" onClick={() => setEditing(true)} className={`${btn.base} ${btn.outline} h-[34px]! px-2.5! text-[13px]`}>
+              <button type="button" onClick={() => setEditing('edit')} className={`${btn.base} ${btn.outline} h-[34px]! px-2.5! text-[13px]`}>
                 编辑
               </button>
             )}
             <select
               id="scale"
-              value={course.gradeScale}
-              onChange={(e) => pickScale(e.target.value as GradeScaleId)}
-              className="h-[34px] rounded-lg border border-edge bg-white px-2.5 text-[13px] text-ink"
+              value={scaleValue}
+              onChange={(e) => pickScale(e.target.value)}
+              className="h-[34px] max-w-[220px] rounded-lg border border-edge bg-white px-2.5 text-[13px] text-ink"
             >
-              {SCALE_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>{o.id === 'custom' && course.customScale?.length ? '自定义' : o.name}</option>
+              {SCALE_OPTIONS.filter((o) => o.id !== 'custom').map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
               ))}
+              {myScales.length > 0 && (
+                <optgroup label="我的预设">
+                  {myScales.map((s) => (
+                    <option key={s.id} value={`my:${s.id}`}>{s.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              <option value="custom">
+                {course.customScale?.length && !usingPreset ? '自定义（本课）' : '自定义…'}
+              </option>
             </select>
           </span>
         </div>
@@ -149,7 +174,15 @@ export function Overview() {
           <span className="pt-0.5 text-[13px] leading-snug text-ink">{r.conclusion}</span>
         </div>
       </div>
-      {editing && <ScaleEditor initial={course.customScale?.length ? course.customScale : scale} onSave={saveScale} onCancel={() => setEditing(false)} />}
+      {editing && (
+        <ScaleEditor
+          initial={course.customScale?.length ? course.customScale : scale}
+          onSave={saveScale}
+          onCancel={() => setEditing(false)}
+          presetNames={myScales.map((s) => s.name)}
+          defaultPresetName={editing === 'edit' ? usingPreset?.name ?? '' : ''}
+        />
+      )}
     </section>
   );
 }
