@@ -5,11 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/CourseContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { NewCourseDialog, RenameDialog, ShareDialog } from './CourseDialogs';
+import { SyllabusImportDialog } from './SyllabusImport';
 import { useConfirm } from './Confirm';
 import { Modal } from './Modal';
-import { btn, IconChevron, IconClose, IconMenu, IconPen, IconPlus, IconShare, IconTrash, IconTrend } from './ui';
+import { btn, IconChevron, IconClose, IconDoc, IconMenu, IconPen, IconPlus, IconShare, IconTrash, IconTrend } from './ui';
 
-type Dialog = 'new' | 'rename' | 'share' | 'courses' | null;
+type Dialog = 'new' | 'rename' | 'share' | 'courses' | 'import' | null;
 
 /** 清空本课分数、删除课程：两种布局共用，都走确认弹窗 */
 function useCourseActions() {
@@ -46,16 +47,23 @@ export function TopBar() {
   const { course } = useApp();
   const mobile = useIsMobile();
   const [dialog, setDialog] = useState<Dialog>(null);
+  /** 从「新建课程」弹窗转过来时带上已填的名称 */
+  const [importName, setImportName] = useState('');
   const { clearScores } = useCourseActions();
   const close = () => setDialog(null);
+  const openImport = (name = '') => {
+    setImportName(name);
+    setDialog('import');
+  };
 
   const dialogs = (
     <>
-      {dialog === 'new' && <NewCourseDialog onClose={close} />}
+      {dialog === 'new' && <NewCourseDialog onClose={close} onImport={openImport} />}
+      {dialog === 'import' && <SyllabusImportDialog onClose={close} initialName={importName} />}
       {dialog === 'rename' && <RenameDialog course={course} onClose={close} />}
       {dialog === 'share' && <ShareDialog course={course} onClose={close} />}
       {dialog === 'courses' && (
-        <CourseSheet onClose={close} onNew={() => setDialog('new')} onRename={() => setDialog('rename')} />
+        <CourseSheet onClose={close} onNew={() => setDialog('new')} onImport={() => openImport()} onRename={() => setDialog('rename')} />
       )}
     </>
   );
@@ -93,7 +101,7 @@ export function TopBar() {
           <IconTrend />
         </div>
         <span className="text-[17px] font-bold">成绩计算器</span>
-        <CourseMenu onNew={() => setDialog('new')} onRename={() => setDialog('rename')} />
+        <CourseMenu onNew={() => setDialog('new')} onImport={() => openImport()} onRename={() => setDialog('rename')} />
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => setDialog('new')} className={`${btn.base} ${btn.outline}`}>新建课程</button>
@@ -113,7 +121,7 @@ export function TopBar() {
 
 // ───────────────────────── 桌面：课程下拉 ─────────────────────────
 
-function CourseMenu({ onNew, onRename }: { onNew: () => void; onRename: () => void }) {
+function CourseMenu({ onNew, onImport, onRename }: { onNew: () => void; onImport: () => void; onRename: () => void }) {
   const { data, course, dispatch } = useApp();
   const { remove } = useCourseActions();
   const [open, setOpen] = useState(false);
@@ -178,6 +186,9 @@ function CourseMenu({ onNew, onRename }: { onNew: () => void; onRename: () => vo
           <button type="button" role="menuitem" onClick={pick(onNew)} className={item}>
             <span className="w-3.5 shrink-0 text-muted"><IconPlus size={13} /></span>新建课程…
           </button>
+          <button type="button" role="menuitem" onClick={pick(onImport)} className={item} data-testid="menu-import">
+            <span className="w-3.5 shrink-0 text-muted"><IconDoc size={13} /></span>从 syllabus 导入…
+          </button>
           <button type="button" role="menuitem" onClick={pick(onRename)} className={item}>
             <span className="w-3.5 shrink-0 text-muted"><IconPen size={13} /></span>重命名当前课程…
           </button>
@@ -192,7 +203,9 @@ function CourseMenu({ onNew, onRename }: { onNew: () => void; onRename: () => vo
 
 // ───────────────────────── 手机：课程列表（底部抽屉，全宽） ─────────────────────────
 
-function CourseSheet({ onClose, onNew, onRename }: { onClose: () => void; onNew: () => void; onRename: () => void }) {
+function CourseSheet({
+  onClose, onNew, onImport, onRename,
+}: { onClose: () => void; onNew: () => void; onImport: () => void; onRename: () => void }) {
   const { data, course, dispatch } = useApp();
   const { clearScores, remove } = useCourseActions();
   const row = 'flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[10px] border-0 bg-transparent px-3 text-left text-[15px] text-ink active:bg-page';
@@ -222,6 +235,9 @@ function CourseSheet({ onClose, onNew, onRename }: { onClose: () => void; onNew:
       <div className="-mx-1 flex flex-col border-t border-divide pt-2">
         <button type="button" onClick={then(onNew)} className={row}>
           <span className="w-4 shrink-0 text-muted"><IconPlus /></span>新建课程
+        </button>
+        <button type="button" onClick={then(onImport)} className={row} data-testid="sheet-import">
+          <span className="w-4 shrink-0 text-muted"><IconDoc /></span>从 syllabus 导入
         </button>
         <button type="button" onClick={then(onRename)} className={row}>
           <span className="w-4 shrink-0 text-muted"><IconPen /></span>重命名「{course.name}」

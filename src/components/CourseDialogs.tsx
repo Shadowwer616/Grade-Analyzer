@@ -10,14 +10,22 @@ import { btn, field } from './ui';
 
 // ───────────────────────── 新建课程 ─────────────────────────
 
-export function NewCourseDialog({ onClose }: { onClose: () => void }) {
+/** 阶段 6：第四个选项「从 syllabus 导入」，选中后「下一步」打开导入弹窗（带上已填的名称） */
+const SYLLABUS = 'syllabus' as const;
+
+export function NewCourseDialog({ onClose, onImport }: { onClose: () => void; onImport?: (name: string) => void }) {
   const { data, dispatch } = useApp();
   const [name, setName] = useState('');
-  const [template, setTemplate] = useState<TemplateId>('hw-mid-final');
+  const [template, setTemplate] = useState<TemplateId | typeof SYLLABUS>('hw-mid-final');
   const taken = data.courses.map((c) => c.name);
   const finalName = uniqueName(name.trim() || '新课程', taken);
+  const importing = template === SYLLABUS;
 
   const create = () => {
+    if (template === SYLLABUS) {
+      onImport?.(name.trim());
+      return;
+    }
     dispatch({ type: 'createCourse', name: finalName, template });
     onClose();
   };
@@ -41,7 +49,7 @@ export function NewCourseDialog({ onClose }: { onClose: () => void }) {
             maxLength={60}
             className={`${field.base} ${field.solid} h-9 text-[15px] mobile:h-11 mobile:text-base`}
           />
-          {name.trim() && finalName !== name.trim() && (
+          {name.trim() && finalName !== name.trim() && !importing && (
             <span className="text-xs font-normal text-bonus-dark">已有同名课程，会保存为「{finalName}」</span>
           )}
         </label>
@@ -69,11 +77,32 @@ export function NewCourseDialog({ onClose }: { onClose: () => void }) {
               </span>
             </label>
           ))}
+          {onImport && (
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-[10px] border px-3.5 py-2.5 ${
+                importing ? 'border-assume bg-assume-row' : 'border-edge bg-white hover:bg-page'
+              }`}
+            >
+              <input
+                type="radio"
+                name="template"
+                value={SYLLABUS}
+                checked={importing}
+                onChange={() => setTemplate(SYLLABUS)}
+                className="accent-assume"
+                data-testid="template-syllabus"
+              />
+              <span className="flex flex-col">
+                <span className="text-sm font-semibold">从 syllabus 导入</span>
+                <span className="text-xs text-muted">粘贴或上传 syllabus（PDF / 文字），自动识别评分构成</span>
+              </span>
+            </label>
+          )}
         </fieldset>
 
         <ModalActions>
           <button type="button" onClick={onClose} className={`${btn.base} ${btn.outline}`}>取消</button>
-          <button type="submit" className={`${btn.base} ${btn.primary}`}>创建</button>
+          <button type="submit" className={`${btn.base} ${btn.primary}`}>{importing ? '下一步' : '创建'}</button>
         </ModalActions>
       </form>
     </Modal>
@@ -124,7 +153,7 @@ export function RenameDialog({ course, onClose }: { course: Course; onClose: () 
 
 // ───────────────────────── 分享链接 ─────────────────────────
 
-async function copyText(text: string): Promise<boolean> {
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;

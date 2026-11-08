@@ -144,3 +144,16 @@ export const IconGrip = ({ size = 14 }: { size?: number }) => (
 export const IconChevronRight = ({ size = 16 }: { size?: number }) => (
   <svg {...svgProps} width={size} height={size} strokeWidth={2.2}><path d="M9 6l6 6-6 6" /></svg>
 );
+
+// ── 阶段 6 新增图标 ──
+
+export const IconUpload = ({ size = 14 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.2}>
+    <path d="M12 15V4M7 9l5-5 5 5M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4" />
+  </svg>
+);
+export const IconDoc = ({ size = 14 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.2}>
+    <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7Z M14 3v4h4 M9 12h6M9 16h6" />
+  </svg>
+);

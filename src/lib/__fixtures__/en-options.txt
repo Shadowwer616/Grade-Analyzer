@@ -1,0 +1,12 @@
+PHYS 151 Mechanics
+
+Students may choose one of two grading options.
+
+Option A:
+Homework 20%
+Midterm 30%
+Final 50%
+
+Option B:
+Homework 20%
+Final 80%

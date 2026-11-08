@@ -1,0 +1,13 @@
+CHEM 110: General Chemistry
+Assessment
+
+| Component        | Weight | Notes                                   |
+|------------------|--------|-----------------------------------------|
+| Quizzes          | 15%    | weekly, online                          |
+| Lab Reports      | 20%    | late penalty -10%/day                   |
+| Midterm Exam     | 25%    |                                         |
+| Final Exam       | 30%    | cumulative                              |
+| Participation    | 10%    |                                         |
+| Total            | 100%   |                                         |
+
+Attendance policy: missing more than 20% of sessions results in a failing grade.

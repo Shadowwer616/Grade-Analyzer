@@ -1,0 +1,10 @@
+CS 101 Introduction to Programming
+
+Points
+Homework (10 × 15 pts) ..... 150 pts
+Quizzes .................... 100 points
+Midterm .................... 250 pts
+Final Exam ................. 400 points
+Project .................... 100 pts
+Total ...................... 1000 points
+Extra credit: up to 20 points.
