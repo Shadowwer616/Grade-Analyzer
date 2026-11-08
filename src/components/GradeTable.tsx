@@ -1,28 +1,63 @@
-import { useEffect, useRef, useState } from 'react';
+// 评分表。桌面端是八列表格；手机端（≤ 640px）换成卡片布局（MobileItems），行内小块共用 ItemParts。
+// 阶段 5：每行加上移 / 下移，桌面端还能按住左边的把手拖动排序；没有评分项时显示三个模板入口。
+import { useRef, useState, type DragEvent } from 'react';
 import type { GradeItem } from '../types';
 import { formatScore as f, isFinalItem, type CourseResult, type ItemResult } from '../lib/grade';
 import { useCourse } from '../state/CourseContext';
-import { btn, feasibilityTone, field, IconChevron, IconClose, IconPen, IconPlus, IconTrash, NumberInput, Pill, trim1 } from './ui';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { btn, field, IconChevron, IconGrip, IconPlus, IconTrash, NumberInput, Pill, trim1 } from './ui';
 import { AdvancedPanel } from './AdvancedPanel';
+import {
+  AssumeEditor, Contribution, EmptyTemplates, itemSecondary, MoveButtons, Need, StatusPill, SubScoreReadout, useNewItemIds, WeightBadge,
+} from './ItemParts';
+import { MobileItems } from './MobileItems';
 
-/** 八列：评分项 / 权重 / 满分 / 已得分 / 状态 / 需要 · 假设 / 高级 / 删除 */
-const GRID = 'grid grid-cols-[2fr_0.7fr_0.7fr_0.9fr_1fr_3fr_76px_34px] items-center gap-4 px-6';
+/** 九列：把手 / 评分项 / 权重 / 满分 / 已得分 / 状态 / 需要 · 假设 / 高级 / 排序 + 删除 */
+const GRID = 'grid grid-cols-[18px_2fr_0.7fr_0.7fr_0.9fr_1fr_3fr_76px_96px] items-center gap-4 pr-6 pl-3';
 
 export function GradeTable() {
-  const { course, result: r, dispatch } = useCourse();
+  const mobile = useIsMobile();
+  return mobile ? <MobileItems /> : <DesktopTable />;
+}
 
-  // 新加的行：名称框自动聚焦
-  const seen = useRef(new Set(course.items.map((i) => i.id)));
-  useEffect(() => {
-    seen.current = new Set(course.items.map((i) => i.id));
-  });
+/** 拖动时的插入位置：第 index 行的上沿（0…n） */
+interface DragState {
+  id: string;
+  over: number | null;
+}
+
+function DesktopTable() {
+  const { course, result: r, dispatch } = useCourse();
+  const isNew = useNewItemIds(course.items);
+  const [drag, setDrag] = useState<DragState | null>(null);
+
+  const move = (id: string, to: number) => dispatch({ type: 'moveItem', id, to });
+
+  const onDragOver = (index: number) => (e: DragEvent<HTMLDivElement>) => {
+    if (!drag) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const rect = e.currentTarget.getBoundingClientRect();
+    const over = e.clientY < rect.top + rect.height / 2 ? index : index + 1;
+    if (over !== drag.over) setDrag({ ...drag, over });
+  };
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    if (drag && drag.over !== null) {
+      const from = course.items.findIndex((i) => i.id === drag.id);
+      // 插入位置在原位置之后时，先拿掉自己，目标下标要减 1
+      const to = drag.over > from ? drag.over - 1 : drag.over;
+      if (from >= 0 && to !== from) move(drag.id, to);
+    }
+    setDrag(null);
+  };
 
   return (
-    <section className="overflow-hidden rounded-[14px] border border-edge bg-white">
+    <section className="overflow-hidden rounded-[14px] border border-edge bg-white" data-testid="grade-table">
       <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-edge px-6 py-4">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-base font-bold">评分构成</h2>
-          <WeightBadge r={r} />
+          {course.items.length > 0 && <WeightBadge r={r} />}
           {course.bonus && (
             <Pill className="bg-bonus-tint text-bonus-dark">Bonus 最多 +{trim1(course.bonus.max)}</Pill>
           )}
@@ -43,48 +78,68 @@ export function GradeTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <div className="flex min-w-[960px] flex-col">
-          <div className={`${GRID} bg-head py-2.5 text-xs font-semibold text-muted`}>
-            <span>评分项</span><span>权重 %</span><span>满分</span><span>已得分</span><span>状态</span><span>需要 · 假设</span>
-            <span className="sr-only">高级</span>
-            <span className="sr-only">删除</span>
-          </div>
-
-          {course.items.map((item) => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              res={r.items.find((x) => x.id === item.id)!}
-              r={r}
-              autoFocus={!seen.current.has(item.id)}
-            />
-          ))}
-
-          {course.items.length === 0 && (
-            <div className="border-t border-divide px-6 py-8 text-center text-sm text-muted">
-              还没有评分项。点「添加评分项」开始，比如作业、期中、期末。
+      {course.items.length === 0 ? (
+        <>
+          <EmptyTemplates />
+          {course.bonus && (
+            <div className="overflow-x-auto">
+              <div className="flex min-w-[1020px] flex-col"><BonusRow /></div>
             </div>
           )}
+        </>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="flex min-w-[1020px] flex-col" onDrop={onDrop} onDragOver={(e) => drag && e.preventDefault()}>
+            <div className={`${GRID} bg-head py-2.5 text-xs font-semibold text-muted`}>
+              {/* sr-only 是绝对定位、不占格子，外面包一层 span 占住把手这一列 */}
+              <span><span className="sr-only">拖动排序</span></span>
+              <span>评分项</span><span>权重 %</span><span>满分</span><span>已得分</span><span>状态</span><span>需要 · 假设</span>
+              <span className="sr-only">高级</span>
+              <span className="sr-only">排序与删除</span>
+            </div>
 
-          {course.bonus && <BonusRow />}
+            {course.items.map((item, k) => (
+              <ItemRow
+                key={item.id}
+                item={item}
+                res={r.items.find((x) => x.id === item.id)!}
+                r={r}
+                autoFocus={isNew(item.id)}
+                onUp={k > 0 ? () => move(item.id, k - 1) : null}
+                onDown={k < course.items.length - 1 ? () => move(item.id, k + 1) : null}
+                dragging={drag?.id === item.id}
+                dropLine={drag && drag.over === k ? 'top' : drag && drag.over === k + 1 && k === course.items.length - 1 ? 'bottom' : null}
+                onDragStart={() => setDrag({ id: item.id, over: null })}
+                onDragEnd={() => setDrag(null)}
+                onDragOver={onDragOver(k)}
+              />
+            ))}
+
+            {course.bonus && <BonusRow />}
+          </div>
         </div>
-      </div>
+      )}
     </section>
-  );
-}
-
-function WeightBadge({ r }: { r: CourseResult }) {
-  return r.weightsOk ? (
-    <Pill className="bg-ok-tint text-ok">权重合计 100%</Pill>
-  ) : (
-    <Pill className="bg-bonus-tint text-bonus-dark">权重合计 {trim1(r.weightTotal)}% · 应为 100%</Pill>
   );
 }
 
 // ───────────────────────── 普通行 ─────────────────────────
 
-function ItemRow({ item, res, r, autoFocus }: { item: GradeItem; res: ItemResult; r: CourseResult; autoFocus: boolean }) {
+function ItemRow({
+  item, res, r, autoFocus, onUp, onDown, dragging, dropLine, onDragStart, onDragEnd, onDragOver,
+}: {
+  item: GradeItem;
+  res: ItemResult;
+  r: CourseResult;
+  autoFocus: boolean;
+  onUp: (() => void) | null;
+  onDown: (() => void) | null;
+  dragging: boolean;
+  dropLine: 'top' | 'bottom' | null;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
+}) {
   const { dispatch } = useCourse();
   const update = (patch: Partial<GradeItem>) => dispatch({ type: 'updateItem', id: item.id, patch });
   const open = res.status !== 'completed';
@@ -92,16 +147,43 @@ function ItemRow({ item, res, r, autoFocus }: { item: GradeItem; res: ItemResult
   const hasSub = !!item.advanced && item.advanced.count > 0;
   const advActive = hasSub || (isFinalItem(item) && !!item.replaces);
   const [expanded, setExpanded] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
+  // 只有按住把手时整行才可拖，免得在输入框里选字时误拖
+  const [armed, setArmed] = useState(false);
 
-  const secondary =
-    res.summary ||
-    (res.status === 'completed'
-      ? item.max !== 100 && res.percent !== null ? `得分率 ${f(res.percent)}%` : '已出分'
-      : res.status === 'assumed' ? '未出分 · 按假设计算' : '未出分');
+  const secondary = itemSecondary(item, res);
+  const line =
+    dropLine === 'top' ? 'shadow-[inset_0_2px_0_var(--color-assume)]' : dropLine === 'bottom' ? 'shadow-[inset_0_-2px_0_var(--color-assume)]' : '';
 
   return (
-    <div>
+    <div
+      ref={rowRef}
+      draggable={armed}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.id);
+        onDragStart();
+      }}
+      onDragEnd={() => {
+        setArmed(false);
+        onDragEnd();
+      }}
+      onDragOver={onDragOver}
+      className={`${line} ${dragging ? 'opacity-40' : ''}`}
+      data-testid={`row-${item.id}`}
+    >
       <div className={`${GRID} border-t border-divide py-3.5 ${res.status === 'assumed' ? 'bg-assume-row' : ''}`}>
+        <span
+          onMouseDown={() => setArmed(true)}
+          onMouseUp={() => setArmed(false)}
+          title="按住拖动排序"
+          aria-hidden
+          data-testid={`grip-${item.id}`}
+          className="flex h-8 cursor-grab items-center justify-center rounded text-dash hover:bg-page hover:text-muted active:cursor-grabbing"
+        >
+          <IconGrip />
+        </span>
+
         <div className="flex min-w-0 flex-col gap-0.5">
           <input
             value={item.name}
@@ -189,135 +271,20 @@ function ItemRow({ item, res, r, autoFocus }: { item: GradeItem; res: ItemResult
           <span className={`transition-transform ${expanded ? 'rotate-180' : ''}`}><IconChevron size={12} /></span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => dispatch({ type: 'removeItem', id: item.id })}
-          aria-label={`删除${label}`}
-          title="删除这一项"
-          className={`${btn.icon} border-transparent bg-transparent hover:border-bad-tint hover:bg-bad-tint hover:text-bad`}
-        >
-          <IconTrash />
-        </button>
+        <div className="flex items-center justify-end gap-0.5">
+          <MoveButtons label={label} onUp={onUp} onDown={onDown} />
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'removeItem', id: item.id })}
+            aria-label={`删除${label}`}
+            title="删除这一项"
+            className={`${btn.icon} h-7! w-7! border-transparent bg-transparent hover:border-bad-tint hover:bg-bad-tint hover:text-bad`}
+          >
+            <IconTrash />
+          </button>
+        </div>
       </div>
       {expanded && <AdvancedPanel item={item} res={res} r={r} />}
-    </div>
-  );
-}
-
-/** 有子项时主表「已得分」只读：完成或全部假设时显示这一项的百分比，否则显示已完成部分 */
-function SubScoreReadout({ res, label }: { res: ItemResult; label: string }) {
-  const v = res.status === 'pending' ? res.currentPercent : res.percent;
-  return (
-    <output
-      aria-label={`${label}已得分（由子项算出）`}
-      title={res.status === 'pending' && v !== null ? '已完成部分，由子项算出' : '由子项算出'}
-      className={`inline-flex h-[34px] w-16 items-center justify-center rounded-lg border border-edge bg-page text-sm ${
-        res.status === 'pending' ? 'text-muted' : 'font-semibold text-ink'
-      }`}
-    >
-      {v === null ? '—' : `${f(v)}%`}
-    </output>
-  );
-}
-
-function StatusPill({ status }: { status: ItemResult['status'] }) {
-  if (status === 'completed') return <Pill className="bg-chip text-chip-ink">已完成</Pill>;
-  if (status === 'assumed')
-    return <Pill className="border border-dashed border-assume bg-assume-tint py-[3px]! text-assume-dark">假设</Pill>;
-  return <Pill className="border border-dash bg-white py-[3px]! text-muted">未完成</Pill>;
-}
-
-function Contribution({ res }: { res: ItemResult }) {
-  const pts = res.normWeight * (res.percent ?? 0);
-  return (
-    <span className="text-[13px] text-muted">
-      已贡献 {f(pts)} / {trim1(res.normWeight * 100)} 分
-    </span>
-  );
-}
-
-/** 未完成：「需要 X%」+「假设」按钮 */
-function Need({
-  item, res, r, onSubAssume,
-}: { item: GradeItem; res: ItemResult; r: CourseResult; onSubAssume?: () => void }) {
-  const { dispatch } = useCourse();
-  const tone = feasibilityTone(r.status);
-  const others = r.items.filter((i) => i.required !== null && i.id !== item.id);
-
-  let note = '';
-  if (res.required !== null) {
-    if (r.status === 'secured') note = '（0 分也能达标）';
-    else if (others.length === 1) note = `（与${others[0].name || '未命名'}均分）`;
-    else if (others.length > 1) note = `（剩余 ${others.length + 1} 项均分）`;
-  }
-
-  // 「假设」默认填需求分（向上取整），没有需求分时填目标
-  const start = res.required !== null ? Math.ceil(res.required - 1e-9) : Math.round(r.target);
-  const assume = () => dispatch({ type: 'assume', id: item.id, value: Math.min(100, Math.max(0, start)) });
-
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-[13px] text-ink">
-        {res.required === null ? (
-          <span className="text-muted">—</span>
-        ) : (
-          <>
-            需要 <strong className={`text-base ${tone.text}`}>{f(Math.max(0, res.required))}%</strong>{' '}
-            <span className="text-muted">{note}</span>
-          </>
-        )}
-      </span>
-      <button
-        type="button"
-        onClick={onSubAssume ?? assume}
-        title={onSubAssume ? '有子项时在「高级」里逐次假设' : undefined}
-        className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-assume bg-white px-3 text-[13px] font-semibold whitespace-nowrap text-assume-dark hover:bg-assume-tint"
-      >
-        <IconPen />{onSubAssume ? '逐次假设' : '假设'}
-      </button>
-    </div>
-  );
-}
-
-/** 假设态：数字框 + 滑块 + ×（假设分是百分比 0–100） */
-function AssumeEditor({ item, label }: { item: GradeItem; label: string }) {
-  const { dispatch } = useCourse();
-  const v = item.assumed ?? 0;
-  const set = (n: number | null) => n !== null && dispatch({ type: 'assume', id: item.id, value: n });
-  const id = `assume-${item.id}`;
-
-  return (
-    <div className="flex items-center gap-2.5">
-      <label htmlFor={id} className="text-[13px] font-semibold whitespace-nowrap text-assume-dark">假设考</label>
-      <NumberInput
-        id={id}
-        value={v}
-        onValue={set}
-        min={0}
-        max={100}
-        step="any"
-        className={`${field.base} w-16 border-assume bg-white font-bold text-assume-dark`}
-      />
-      {item.max !== 100 && <span className="text-[13px] text-assume-dark">%</span>}
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={Math.round(v)}
-        onChange={(e) => set(Number(e.target.value))}
-        aria-label={`${label}假设分数滑块`}
-        className="min-w-0 flex-[1_1_120px]"
-      />
-      <button
-        type="button"
-        onClick={() => dispatch({ type: 'clearAssumption', id: item.id })}
-        aria-label={`清除${label}的假设`}
-        title="清除假设"
-        className={btn.icon}
-      >
-        <IconClose />
-      </button>
     </div>
   );
 }
@@ -330,7 +297,8 @@ function BonusRow() {
   const update = (patch: Partial<typeof bonus>) => dispatch({ type: 'updateBonus', patch });
 
   return (
-    <div className={`${GRID} border-t border-dashed border-bonus-edge bg-bonus-row py-3.5`}>
+    <div className={`${GRID} border-t border-dashed border-bonus-edge bg-bonus-row py-3.5`} data-testid="bonus-row">
+      <span />
       <div className="flex min-w-0 flex-col gap-0.5">
         <input
           value={bonus.name}
@@ -374,15 +342,17 @@ function BonusRow() {
         </span>
       </span>
       <span />
-      <button
-        type="button"
-        onClick={() => dispatch({ type: 'removeBonus' })}
-        aria-label="删除 Bonus"
-        title="删除 Bonus"
-        className={`${btn.icon} border-transparent bg-transparent hover:border-bad-tint hover:bg-bad-tint hover:text-bad`}
-      >
-        <IconTrash />
-      </button>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'removeBonus' })}
+          aria-label="删除 Bonus"
+          title="删除 Bonus"
+          className={`${btn.icon} h-7! w-7! border-transparent bg-transparent hover:border-bad-tint hover:bg-bad-tint hover:text-bad`}
+        >
+          <IconTrash />
+        </button>
+      </div>
     </div>
   );
 }

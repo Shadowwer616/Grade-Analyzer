@@ -35,9 +35,9 @@ export function AdvancedPanel({ item, res, r }: { item: GradeItem; res: ItemResu
   return (
     <div
       id={`adv-${item.id}`}
-      className={`border-t border-divide px-6 pt-1 pb-4 ${res.status === 'assumed' ? 'bg-assume-row' : 'bg-head'}`}
+      className={`border-t border-divide px-6 pt-1 pb-4 ${res.status === 'assumed' ? 'bg-assume-row' : 'bg-head'} mobile:border-t-0 mobile:bg-transparent mobile:px-3.5 mobile:pt-3 mobile:pb-0`}
     >
-      <div className="flex flex-col gap-4 rounded-xl border border-edge bg-white px-5 py-4">
+      <div className="flex flex-col gap-4 rounded-xl border border-edge bg-white px-5 py-4 mobile:px-3 mobile:py-3">
         {isFinalItem(item) && <ReplaceSection item={item} r={r} />}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -92,7 +92,7 @@ function ReplaceSection({ item, r }: { item: GradeItem; r: CourseResult }) {
         id={`rep-${item.id}`}
         value={item.replaces ?? ''}
         onChange={(e) => dispatch({ type: 'updateItem', id: item.id, patch: { replaces: e.target.value || null } })}
-        className="h-[34px] max-w-[320px] rounded-lg border border-edge bg-white px-2.5 text-[13px] text-ink"
+        className="h-[34px] max-w-[320px] rounded-lg border border-edge bg-white px-2.5 text-[13px] text-ink mobile:h-11 mobile:w-full mobile:max-w-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value} disabled={o.disabled}>{o.label}</option>
@@ -209,7 +209,7 @@ function SubItems({
 
       {/* 剩余全部假设 + 粘贴录入 */}
       <div className="flex flex-wrap items-start gap-x-8 gap-y-3 border-t border-divide pt-4 text-[13px]">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink">剩余全部假设为</span>
           <NumberInput
             value={xAll}
@@ -277,7 +277,7 @@ function SubCell({
     : 'border-dashed border-dash bg-white';
 
   return (
-    <div role="listitem" className={`flex w-[92px] flex-col gap-1.5 rounded-lg border p-2 ${tone}`} data-testid={`sub-${j}`}>
+    <div role="listitem" className={`flex w-[92px] flex-col gap-1.5 rounded-lg border p-2 ${tone} mobile:w-[calc((100%-16px)/3)]`} data-testid={`sub-${j}`}>
       <span className="flex items-center justify-between text-[11px] text-muted">
         <span>第 {n} 次</span>
         {dropped && <span className="font-semibold text-chip-ink" title="按「去掉最低」不计入">去掉</span>}
@@ -293,7 +293,7 @@ function SubCell({
           aria-label={`${label}第 ${n} 次得分`}
           aria-invalid={over}
           title={over ? `超过满分 ${raw1(m)}` : undefined}
-          className={`${field.base} h-[30px]! w-full px-1.5 text-center ${
+          className={`${field.base} h-[30px]! w-full px-1.5 text-center mobile:h-9! ${
             over ? 'border-bad text-bad' : score !== null ? `border-edge bg-white font-semibold ${dropped ? 'text-muted line-through' : ''}` : 'border-dash bg-transparent'
           }`}
         />
@@ -323,14 +323,14 @@ function SubCell({
               max={m}
               step="any"
               aria-label={`${label}第 ${n} 次假设分`}
-              className={`${field.base} h-[26px]! w-full px-1 text-center text-xs font-bold border-assume bg-white text-assume-dark`}
+              className={`${field.base} h-[26px]! w-full px-1 text-center text-xs font-bold border-assume bg-white text-assume-dark mobile:h-9!`}
             />
             <button
               type="button"
               onClick={() => onChange(setSubAssumed(adv, j, null))}
               aria-label={`清除${label}第 ${n} 次的假设`}
               title="清除假设"
-              className="inline-flex h-[26px] w-[22px] shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink"
+              className="inline-flex h-[26px] w-[22px] shrink-0 cursor-pointer items-center justify-center rounded-md text-muted hover:bg-page hover:text-ink mobile:h-9 mobile:w-7"
             >
               <IconClose size={12} />
             </button>
@@ -341,7 +341,7 @@ function SubCell({
             onClick={startAssume}
             aria-label={`假设${label}第 ${n} 次`}
             title={need !== null ? `默认填至少需要的 ${raw1(Math.max(0, need))} 分` : undefined}
-            className="inline-flex h-[26px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-assume bg-white text-[11px] font-semibold text-assume-dark hover:bg-assume-tint"
+            className="inline-flex h-[26px] cursor-pointer items-center justify-center gap-1 rounded-md border border-dashed border-assume bg-white text-[11px] font-semibold text-assume-dark hover:bg-assume-tint mobile:h-9 mobile:text-xs"
           >
             <IconPen size={11} />假设
           </button>

@@ -5,7 +5,7 @@ import { TEMPLATES, type TemplateId } from '../data/templates';
 import { buildShareUrl } from '../lib/share';
 import { uniqueName } from '../state/appStore';
 import { useApp } from '../state/CourseContext';
-import { Modal } from './Modal';
+import { Modal, ModalActions } from './Modal';
 import { btn, field } from './ui';
 
 // ───────────────────────── 新建课程 ─────────────────────────
@@ -39,7 +39,7 @@ export function NewCourseDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => setName(e.target.value)}
             placeholder="如 线性代数"
             maxLength={60}
-            className={`${field.base} ${field.solid} h-9 text-[15px]`}
+            className={`${field.base} ${field.solid} h-9 text-[15px] mobile:h-11 mobile:text-base`}
           />
           {name.trim() && finalName !== name.trim() && (
             <span className="text-xs font-normal text-bonus-dark">已有同名课程，会保存为「{finalName}」</span>
@@ -71,10 +71,10 @@ export function NewCourseDialog({ onClose }: { onClose: () => void }) {
           ))}
         </fieldset>
 
-        <div className="flex justify-end gap-2">
+        <ModalActions>
           <button type="button" onClick={onClose} className={`${btn.base} ${btn.outline}`}>取消</button>
           <button type="submit" className={`${btn.base} ${btn.primary}`}>创建</button>
-        </div>
+        </ModalActions>
       </form>
     </Modal>
   );
@@ -107,16 +107,16 @@ export function RenameDialog({ course, onClose }: { course: Course; onClose: () 
             onChange={(e) => setName(e.target.value)}
             onFocus={(e) => e.target.select()}
             maxLength={60}
-            className={`${field.base} ${field.solid} h-9 text-[15px]`}
+            className={`${field.base} ${field.solid} h-9 text-[15px] mobile:h-11 mobile:text-base`}
           />
           <span className="min-h-4 text-xs font-normal text-bad">
             {!trimmed ? '名称不能为空' : clash ? '已有同名课程' : ''}
           </span>
         </label>
-        <div className="flex justify-end gap-2">
+        <ModalActions>
           <button type="button" onClick={onClose} className={`${btn.base} ${btn.outline}`}>取消</button>
           <button type="submit" disabled={!trimmed || clash} className={`${btn.base} ${btn.primary}`}>保存</button>
-        </div>
+        </ModalActions>
       </form>
     </Modal>
   );
@@ -167,20 +167,20 @@ export function ShareDialog({ course, onClose }: { course: Course; onClose: () =
   const copy = async () => setCopied((await copyText(url)) ? 'ok' : 'fail');
 
   return (
-    <Modal title={`分享「${course.name}」`} onClose={onClose} width={480}>
+    <Modal title={`分享「${course.name}」`} onClose={onClose} width={480} testId="share-dialog">
       <p className="-mt-2 m-0 text-xs leading-relaxed text-muted">
         链接里包含这门课的全部设置和分数（含假设、子项、等级表）。对方打开后会导入为一门新课程，不会和你的数据同步。
       </p>
-      <div className="flex gap-2">
+      <div className="flex gap-2 mobile:flex-col">
         <input
           readOnly
           value={url}
           onFocus={(e) => e.target.select()}
           aria-label="分享链接"
           data-testid="share-url"
-          className={`${field.base} ${field.solid} min-w-0 flex-1 font-mono text-xs text-muted`}
+          className={`${field.base} ${field.solid} min-w-0 flex-1 font-mono text-xs text-muted mobile:h-11 mobile:flex-none`}
         />
-        <button type="button" onClick={copy} className={`${btn.base} ${btn.primary} shrink-0`}>
+        <button type="button" onClick={copy} className={`${btn.base} ${btn.primary} shrink-0 mobile:h-11`}>
           {copied === 'ok' ? '已复制' : '复制链接'}
         </button>
       </div>
@@ -199,9 +199,9 @@ export function ShareDialog({ course, onClose }: { course: Course; onClose: () =
         {qr && 'error' in qr && <span className="py-6 text-xs text-muted">{qr.error}</span>}
         <span className="text-xs text-muted">手机扫码打开</span>
       </div>
-      <div className="flex justify-end">
+      <ModalActions>
         <button type="button" onClick={onClose} className={`${btn.base} ${btn.outline}`}>完成</button>
-      </div>
+      </ModalActions>
     </Modal>
   );
 }
@@ -236,9 +236,9 @@ export function ImportConflictDialog() {
           <span className="text-xs text-muted">原来那门课的设置和分数会被替换，不能撤销</span>
         </button>
       </div>
-      <div className="flex justify-end">
+      <ModalActions>
         <button type="button" onClick={() => resolveConflict(null)} className={`${btn.base} ${btn.outline}`}>不导入</button>
-      </div>
+      </ModalActions>
     </Modal>
   );
 }

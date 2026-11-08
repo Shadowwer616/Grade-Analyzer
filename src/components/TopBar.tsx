@@ -1,23 +1,90 @@
 // 顶栏（阶段 4）：课程下拉（切换 / 新建 / 重命名 / 删除）、新建课程、分享链接、清空本课分数。
+// 阶段 5：手机端改成 左菜单图标（课程列表）· 中间课程名 · 右分享图标；课程列表是底部抽屉里的全宽列表；
+// window.confirm 换成自己的确认弹窗。
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/CourseContext';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { NewCourseDialog, RenameDialog, ShareDialog } from './CourseDialogs';
-import { btn, IconChevron, IconPen, IconPlus, IconTrash, IconTrend } from './ui';
+import { useConfirm } from './Confirm';
+import { Modal } from './Modal';
+import { btn, IconChevron, IconClose, IconMenu, IconPen, IconPlus, IconShare, IconTrash, IconTrend } from './ui';
 
-type Dialog = 'new' | 'rename' | 'share' | null;
+type Dialog = 'new' | 'rename' | 'share' | 'courses' | null;
+
+/** 清空本课分数、删除课程：两种布局共用，都走确认弹窗 */
+function useCourseActions() {
+  const { data, course, dispatch } = useApp();
+  const confirm = useConfirm();
+
+  const clearScores = async () => {
+    const ok = await confirm({
+      title: '清空本课分数',
+      message: `清空「${course.name}」的所有已得分、子项分、假设和 Bonus 已得？\n评分项、权重、等级表和目标都会保留。`,
+      confirmLabel: '清空',
+      danger: true,
+    });
+    if (ok) dispatch({ type: 'course', action: { type: 'clearScores' } });
+  };
+
+  const remove = async () => {
+    const last = data.courses.length === 1;
+    const ok = await confirm({
+      title: '删除课程',
+      message: last
+        ? `删除「${course.name}」？这是最后一门课，删除后会自动建一门示例课程。`
+        : `删除「${course.name}」？这门课的所有设置和分数都会删掉，不能撤销。`,
+      confirmLabel: '删除',
+      danger: true,
+    });
+    if (ok) dispatch({ type: 'deleteCourse', id: course.id });
+  };
+
+  return { clearScores, remove };
+}
 
 export function TopBar() {
-  const { course, dispatch } = useApp();
+  const { course } = useApp();
+  const mobile = useIsMobile();
   const [dialog, setDialog] = useState<Dialog>(null);
+  const { clearScores } = useCourseActions();
+  const close = () => setDialog(null);
 
-  const clearScores = () => {
-    if (
-      window.confirm(
-        `清空「${course.name}」的所有已得分、子项分、假设和 Bonus 已得？\n评分项、权重、等级表和目标都会保留。`,
-      )
-    )
-      dispatch({ type: 'course', action: { type: 'clearScores' } });
-  };
+  const dialogs = (
+    <>
+      {dialog === 'new' && <NewCourseDialog onClose={close} />}
+      {dialog === 'rename' && <RenameDialog course={course} onClose={close} />}
+      {dialog === 'share' && <ShareDialog course={course} onClose={close} />}
+      {dialog === 'courses' && (
+        <CourseSheet onClose={close} onNew={() => setDialog('new')} onRename={() => setDialog('rename')} />
+      )}
+    </>
+  );
+
+  if (mobile) {
+    const icon = 'flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border-0 bg-transparent text-ink active:bg-page';
+    return (
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-edge bg-white px-3 py-3.5 pt-[max(14px,env(safe-area-inset-top))]">
+        <button type="button" onClick={() => setDialog('courses')} aria-label="课程列表" className={icon} data-testid="m-menu">
+          <IconMenu />
+        </button>
+        <button
+          type="button"
+          onClick={() => setDialog('courses')}
+          aria-haspopup="dialog"
+          title="切换课程"
+          data-testid="course-menu"
+          className="flex h-11 min-w-0 cursor-pointer items-center gap-1.5 rounded-[10px] border-0 bg-transparent px-3 text-[17px] font-bold text-ink active:bg-page"
+        >
+          <span className="truncate">{course.name}</span>
+          <span className="shrink-0 text-muted"><IconChevron /></span>
+        </button>
+        <button type="button" onClick={() => setDialog('share')} aria-label="分享链接" className={icon} data-testid="m-share">
+          <IconShare />
+        </button>
+        {dialogs}
+      </header>
+    );
+  }
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-edge bg-white px-4 py-3.5 sm:px-8">
@@ -39,18 +106,16 @@ export function TopBar() {
           清空本课分数
         </button>
       </div>
-
-      {dialog === 'new' && <NewCourseDialog onClose={() => setDialog(null)} />}
-      {dialog === 'rename' && <RenameDialog course={course} onClose={() => setDialog(null)} />}
-      {dialog === 'share' && <ShareDialog course={course} onClose={() => setDialog(null)} />}
+      {dialogs}
     </header>
   );
 }
 
-// ───────────────────────── 课程下拉 ─────────────────────────
+// ───────────────────────── 桌面：课程下拉 ─────────────────────────
 
 function CourseMenu({ onNew, onRename }: { onNew: () => void; onRename: () => void }) {
   const { data, course, dispatch } = useApp();
+  const { remove } = useCourseActions();
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
@@ -69,14 +134,6 @@ function CourseMenu({ onNew, onRename }: { onNew: () => void; onRename: () => vo
   const pick = (fn: () => void) => () => {
     setOpen(false);
     fn();
-  };
-
-  const remove = () => {
-    const last = data.courses.length === 1;
-    const msg = last
-      ? `删除「${course.name}」？这是最后一门课，删除后会自动建一门示例课程。`
-      : `删除「${course.name}」？这门课的所有设置和分数都会删掉，不能撤销。`;
-    if (window.confirm(msg)) dispatch({ type: 'deleteCourse', id: course.id });
   };
 
   const item = 'flex w-full cursor-pointer items-center gap-2 rounded-md border-0 bg-transparent px-2.5 py-2 text-left text-sm text-ink hover:bg-page';
@@ -130,5 +187,52 @@ function CourseMenu({ onNew, onRename }: { onNew: () => void; onRename: () => vo
         </div>
       )}
     </div>
+  );
+}
+
+// ───────────────────────── 手机：课程列表（底部抽屉，全宽） ─────────────────────────
+
+function CourseSheet({ onClose, onNew, onRename }: { onClose: () => void; onNew: () => void; onRename: () => void }) {
+  const { data, course, dispatch } = useApp();
+  const { clearScores, remove } = useCourseActions();
+  const row = 'flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-[10px] border-0 bg-transparent px-3 text-left text-[15px] text-ink active:bg-page';
+  // 先关列表再做事：确认弹窗、新建 / 重命名弹窗都不叠在列表上面
+  const then = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+
+  return (
+    <Modal title={`我的课程 · ${data.courses.length}`} onClose={onClose} testId="course-sheet">
+      <div className="-mx-1 flex flex-col" role="list">
+        {data.courses.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="listitem"
+            aria-current={c.id === course.id ? 'true' : undefined}
+            onClick={then(() => dispatch({ type: 'switchCourse', id: c.id }))}
+            className={`${row} ${c.id === course.id ? 'bg-assume-row font-semibold' : ''}`}
+          >
+            <span className={`w-4 shrink-0 text-assume ${c.id === course.id ? '' : 'invisible'}`}>✓</span>
+            <span className="min-w-0 flex-1 truncate">{c.name}</span>
+          </button>
+        ))}
+      </div>
+      <div className="-mx-1 flex flex-col border-t border-divide pt-2">
+        <button type="button" onClick={then(onNew)} className={row}>
+          <span className="w-4 shrink-0 text-muted"><IconPlus /></span>新建课程
+        </button>
+        <button type="button" onClick={then(onRename)} className={row}>
+          <span className="w-4 shrink-0 text-muted"><IconPen /></span>重命名「{course.name}」
+        </button>
+        <button type="button" onClick={then(clearScores)} className={row}>
+          <span className="w-4 shrink-0 text-muted"><IconClose /></span>清空本课分数
+        </button>
+        <button type="button" onClick={then(remove)} className={`${row} text-bad`}>
+          <span className="w-4 shrink-0"><IconTrash /></span>删除这门课
+        </button>
+      </div>
+    </Modal>
   );
 }

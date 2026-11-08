@@ -119,3 +119,28 @@ export const field = {
 
 /** 1.0 → "1"，92.6 → "92.6"（权重、满分这类不需要固定 1 位小数的地方） */
 export const trim1 = (n: number) => String(Math.round(n * 10) / 10);
+
+// ── 阶段 5 新增图标 ──
+
+export const IconMenu = ({ size = 22 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.2}><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+);
+export const IconShare = ({ size = 20 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.2}>
+    <path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+  </svg>
+);
+export const IconArrowUp = ({ size = 14 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.4}><path d="M12 19V5M6 11l6-6 6 6" /></svg>
+);
+export const IconArrowDown = ({ size = 14 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.4}><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+);
+export const IconGrip = ({ size = 14 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={3}>
+    <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" />
+  </svg>
+);
+export const IconChevronRight = ({ size = 16 }: { size?: number }) => (
+  <svg {...svgProps} width={size} height={size} strokeWidth={2.2}><path d="M9 6l6 6-6 6" /></svg>
+);

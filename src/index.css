@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 阶段 5：手机端断点，和 hooks/useIsMobile.ts 一致（视口 ≤ 640px） */
+@custom-variant mobile (@media (max-width: 640px));
+
 /* 颜色和字体按《P1 设计方案》第 4 节；辅助色取自画板「成绩计算器 · 界面设计」 */
 @theme {
   --color-ink: #16181d;
@@ -47,6 +50,38 @@ input[type="range"] {
   accent-color: var(--color-assume);
   height: 28px;
   margin: 0;
+}
+
+/* 手机端：滑块触控区 ≥ 44px；输入框、下拉至少 16px 字，免得 iOS 聚焦时自动放大页面 */
+@media (max-width: 640px) {
+  input[type="range"] {
+    height: 44px;
+  }
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not(#target-num),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* 底部抽屉从下往上滑出 */
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.sheet-in {
+  animation: sheet-up 0.18s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in {
+    animation: none;
+  }
 }
 
 /* 数字框不显示上下箭头（画板里没有，也会挤掉「未出分」占位文字） */

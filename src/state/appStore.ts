@@ -24,7 +24,9 @@ export type AppAction =
   | { type: 'importCourse'; course: Course; mode: ImportMode }
   /** 「存为我的预设」：同名预设会被覆盖 */
   | { type: 'saveMyScale'; name: string; entries: ScaleEntry[] }
-  | { type: 'deleteMyScale'; id: string };
+  | { type: 'deleteMyScale'; id: string }
+  /** 阶段 5：改预设名；空名或和其他预设重名时不改 */
+  | { type: 'renameMyScale'; id: string; name: string };
 
 export function currentCourse(data: SavedData): Course {
   return data.courses.find((c) => c.id === data.currentId) ?? data.courses[0];
@@ -138,6 +140,14 @@ export function appReducer(data: SavedData, action: AppAction): SavedData {
       return data.myScales.some((s) => s.id === action.id)
         ? { ...data, myScales: data.myScales.filter((s) => s.id !== action.id) }
         : data;
+
+    case 'renameMyScale': {
+      const name = action.name.trim();
+      const target = data.myScales.find((s) => s.id === action.id);
+      if (!target || !name || target.name === name) return data;
+      if (data.myScales.some((s) => s.id !== action.id && s.name === name)) return data;
+      return { ...data, myScales: data.myScales.map((s) => (s.id === action.id ? { ...s, name } : s)) };
+    }
   }
 }
 

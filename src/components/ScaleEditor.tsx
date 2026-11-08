@@ -1,9 +1,11 @@
 // 自定义等级表编辑器（方案 §2.4，阶段 3）：改每档名称和下限、增删档位，保存为课程的 customScale。
 // 阶段 4：可勾选「存为我的预设」，同时存进 myScales，所有课程都能选。
+// 阶段 5：外壳换成通用 Modal（手机上是底部抽屉）。
 import { useEffect, useRef, useState } from 'react';
 import type { ScaleEntry } from '../types';
 import { checkScale } from '../lib/scales';
-import { btn, field, IconClose, IconPlus, IconTrash, NumberInput } from './ui';
+import { Modal, ModalActions } from './Modal';
+import { btn, field, IconPlus, IconTrash, NumberInput } from './ui';
 
 interface Row {
   key: number;
@@ -32,13 +34,8 @@ export function ScaleEditor({
   );
   const firstInput = useRef<HTMLInputElement>(null);
 
-  const cancelRef = useRef(onCancel);
-  cancelRef.current = onCancel;
   useEffect(() => {
     firstInput.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && cancelRef.current();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   const entries: ScaleEntry[] = rows.map((r) => [r.label, r.min ?? NaN]);
@@ -54,23 +51,10 @@ export function ScaleEditor({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onCancel()}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="scale-editor-title"
-        className="flex max-h-[90vh] w-full max-w-[440px] flex-col gap-4 overflow-hidden rounded-[14px] bg-white px-6 py-5 shadow-xl"
-      >
-        <div className="flex items-center justify-between">
-          <h2 id="scale-editor-title" className="text-base font-bold">自定义等级表</h2>
-          <button type="button" onClick={onCancel} aria-label="关闭" className={btn.icon}><IconClose /></button>
-        </div>
+    <Modal title="自定义等级表" onClose={onCancel} testId="scale-editor">
         <p className="-mt-2 text-xs text-muted">每档填等级名和下限分数（含），保存时按下限从高到低排序。</p>
 
-        <div className="flex flex-col gap-2 overflow-y-auto">
+        <div className="flex flex-col gap-2">
           <div className="grid grid-cols-[1fr_96px_34px] gap-2 text-xs font-semibold text-muted">
             <span>等级</span><span>下限 ≥</span><span className="sr-only">删除</span>
           </div>
@@ -140,7 +124,7 @@ export function ScaleEditor({
           ) : null}
         </div>
 
-        <div className="flex justify-end gap-2">
+        <ModalActions>
           <button type="button" onClick={onCancel} className={`${btn.base} ${btn.outline}`}>取消</button>
           <button
             type="button"
@@ -150,8 +134,7 @@ export function ScaleEditor({
           >
             保存
           </button>
-        </div>
-      </div>
-    </div>
+        </ModalActions>
+    </Modal>
   );
 }

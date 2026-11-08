@@ -27,15 +27,20 @@ export const TEMPLATES: { id: TemplateId; name: string; detail: string; items: O
   { id: 'blank', name: '空白', detail: '自己添加评分项', items: [] },
 ];
 
-export function courseFromTemplate(id: string, name: string, template: TemplateId): Course {
+/** 模板的评分项（满分 100、未出分）；空白模板返回空数组 */
+export function templateItems(template: TemplateId): GradeItem[] {
   const t = TEMPLATES.find((x) => x.id === template) ?? TEMPLATES[TEMPLATES.length - 1];
+  return t.items.map((i) => ({ ...i, max: 100, score: null }));
+}
+
+export function courseFromTemplate(id: string, name: string, template: TemplateId): Course {
   return {
     id,
     name: name.trim() || '新课程',
     target: 85,
     gradeScale: 'us-10',
     customScale: null,
-    items: t.items.map((i) => ({ ...i, max: 100, score: null })),
+    items: templateItems(template),
     bonus: null,
     updatedAt: new Date().toISOString(),
   };

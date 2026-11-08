@@ -2,8 +2,10 @@
 // 阶段 2 只有一门课、不保存；阶段 4 再把课程数组同步到 localStorage。
 // 阶段 3：子项面板的编辑由 lib/advanced.ts 算出新的 advanced，再走 updateItem；等级表走 setScale。
 // 阶段 4：多课程在 state/appStore.ts，这里仍只管一门课；新增 clearScores、normalizeWeights，updateItem 加 commit。
+// 阶段 5：新增 moveItem（上移 / 下移 / 拖动排序）、applyTemplate（空状态的模板入口）。
 import type { BonusItem, Course, GradeItem, GradeScaleId, ScaleEntry } from '../types';
 import { sampleCourse } from '../data/sampleCourse';
+import { templateItems, type TemplateId } from '../data/templates';
 import { isFinalItem, normalizeWeights } from '../lib/grade';
 
 export type CourseAction =
@@ -27,6 +29,10 @@ export type CourseAction =
   | { type: 'clearScores' }
   /** 权重按比例归一化到合计 100（grade.ts 的 normalizeWeights） */
   | { type: 'normalizeWeights' }
+  /** 把一项移到第 to 位（0 起，按移动后的数组算）；越界时夹到两端 */
+  | { type: 'moveItem'; id: string; to: number }
+  /** 空状态的模板入口：只在没有评分项时生效，按模板填入评分项 */
+  | { type: 'applyTemplate'; template: TemplateId }
   | { type: 'reset' };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -122,6 +128,23 @@ function apply(course: Course, action: CourseAction): Course {
       return next.items.every((i, k) => i.weight === course.items[k].weight) ? course : next;
     }
 
+    case 'moveItem': {
+      const from = course.items.findIndex((i) => i.id === action.id);
+      if (from < 0) return course;
+      const to = clamp(Math.round(action.to), 0, course.items.length - 1);
+      if (to === from) return course;
+      const items = course.items.filter((i) => i.id !== action.id);
+      items.splice(to, 0, course.items[from]);
+      return { ...course, items };
+    }
+
+    case 'applyTemplate': {
+      if (course.items.length > 0) return course;
+      const items = templateItems(action.template);
+      // 空白模板：加一行新评分项，和「添加评分项」一样
+      return items.length > 0 ? { ...course, items } : apply(course, { type: 'addItem' });
+    }
+
     case 'reset':
       return sampleCourse();
   }
@@ -131,4 +154,11 @@ export function courseReducer(course: Course, action: CourseAction): Course {
   const next = apply(course, action);
   if (next === course || action.type === 'reset') return next;
   return { ...next, updatedAt: new Date().toISOString() };
+}
+
+/** 有没有任何假设（主表或子项）：「清除全部假设」「清空假设」按钮据此置灰 */
+export function hasAssumptions(course: Course): boolean {
+  return course.items.some(
+    (i) => (i.assumed !== null && i.assumed !== undefined) || !!i.advanced?.assumed.some((a) => a !== null),
+  );
 }
