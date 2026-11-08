@@ -2,7 +2,11 @@
 
 一个纯前端的课程成绩计算器：录入每一项的权重和分数，马上看到当前成绩、含假设的预估，以及剩下的考试要考多少才能达到目标。没有账号、没有后端，数据只存在你自己的浏览器里。
 
-在线使用：<https://shadowwer616.github.io/grade-analyzer/>（推到 `main` 后由 GitHub Actions 自动发布）
+在线使用：<https://shadowwer616.github.io/Grade-Analyzer/>（推到 `main` 后由 GitHub Actions 自动发布；需先在仓库 Settings → Pages 启用，见「部署」）
+
+| 手机（390px） | 桌面（1280px） |
+| --- | --- |
+| <img src="docs/screenshots/mobile-390.png" width="260"> | <img src="docs/screenshots/desktop-1280.png" width="520"> |
 
 ## 能做什么
 
@@ -71,6 +75,6 @@ src/
 
 `.github/workflows/deploy.yml`：每次推到 `main`，GitHub Actions 依次 `npm ci` → `npm test` → `npm run build`，再用 `actions/upload-pages-artifact` + `actions/deploy-pages` 把 `dist/` 发布到 GitHub Pages。测试不过就不会发布。
 
-- 仓库 Settings → Pages → Source 要选 **GitHub Actions**。
+- 仓库 Settings → Pages → Source 要选 **GitHub Actions**。如果工作流在 `configure-pages` 这一步报「Get Pages site failed / Not Found」，说明 Pages 还没真正启用：私有仓库需要 GitHub Pro / Team 等付费方案才能开 Pages，否则要把仓库改成公开。启用后在 Actions 页面对失败的那次点「Re-run jobs」，或手动运行「Deploy to GitHub Pages」即可。
 - `vite.config.ts` 里 `base: './'`，所有资源（包括分享弹窗按需加载的二维码 chunk）都用相对路径，所以部署在 `/grade-analyzer/` 这样的子路径下也能用；换到 Vercel 或别的静态托管同样不用改配置。
 - 分享链接用的是当前页面地址，换域名后旧链接里的地址会变，但 `#c=` 后面的数据不受影响，粘到新地址后面照样能导入。
