@@ -531,3 +531,31 @@ function buildConclusion(r: CourseResult, byId: Map<string, ItemEval>, normal: S
     }
   }
 }
+
+// ───────────────────────── 进度条（阶段 2 新增） ─────────────────────────
+
+/**
+ * 总览进度条五段（方案 §2.4），单位都是百分制的分数点：
+ * 已拿到 = 已锁定 E（已完成 + 假设，不含 Bonus）；Bonus = B；
+ * 剩余容量 = 最高可能 − 最低可能（= 100R，期末替代时按更好的场景）；
+ * 已失 = 100 − 已拿到 − 剩余容量；还需 = 目标距最低可能的差，限在剩余容量内；余量 = 剩余容量 − 还需。
+ */
+export interface ProgressBreakdown {
+  earned: number;
+  bonus: number;
+  lost: number;
+  need: number;
+  slack: number;
+  /** 五段合计（= 100 + Bonus），画进度条时作分母 */
+  total: number;
+}
+
+export function progressBreakdown(r: CourseResult): ProgressBreakdown {
+  const earned = Math.max(0, r.locked);
+  const bonus = r.bonusPoints;
+  const open = Math.max(0, r.maxPossible - r.minPossible);
+  const lost = Math.max(0, 100 - earned - open);
+  const need = Math.min(open, Math.max(0, r.target - r.minPossible));
+  const slack = Math.max(0, open - need);
+  return { earned, bonus, lost, need, slack, total: earned + bonus + lost + need + slack };
+}

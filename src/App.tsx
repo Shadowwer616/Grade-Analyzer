@@ -1,11 +1,22 @@
-// 阶段 1 占位：只确认项目能启动、Tailwind 生效。界面在阶段 2。
+import { CourseProvider } from './state/CourseContext';
+import { TopBar } from './components/TopBar';
+import { Overview } from './components/Overview';
+import { GradeTable } from './components/GradeTable';
+import { Conclusion } from './components/Conclusion';
+
+// 页面从上到下：顶栏 → 总览 → 评分表 → 结论（方案 §2、§4）。所有输入即时生效，没有「计算」按钮。
 export default function App() {
   return (
-    <main className="min-h-screen bg-page text-ink font-sans flex items-center justify-center p-6">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">课程成绩计算器</h1>
-        <p className="mt-2 text-sm text-ink/60">计算核心已就绪，界面将在第 2 阶段完成。</p>
+    <CourseProvider>
+      <div className="flex min-h-screen flex-col bg-page font-sans text-ink">
+        <TopBar />
+        <main className="mx-auto box-border flex w-full max-w-[1120px] flex-col gap-5 px-4 pt-6 pb-10 sm:px-8">
+          <Overview />
+          <GradeTable />
+          <Conclusion />
+          <p className="m-0 text-center text-xs text-muted">当前版本还不保存数据，刷新后回到示例课程</p>
+        </main>
       </div>
-    </main>
+    </CourseProvider>
   );
 }
